@@ -40,14 +40,17 @@ def serialize_fp32(file, tensor):
 def serialize_int8(file, tensor):
     """ writes one int8 tensor to file that is open in wb mode """
     d = tensor.detach().cpu().view(-1).numpy().astype(np.int8)
+    print(d.shape)
+    print(d)
     b = struct.pack(f'{len(d)}b', *d)
     file.write(b)
 
+"""
 def quantize_q80(w, group_size):
-    """
-    takes a tensor and returns the Q8_0 quantized version
-    i.e. symmetric quantization into int8, range [-127,127]
-    """
+    
+    #takes a tensor and returns the Q8_0 quantized version
+    #i.e. symmetric quantization into int8, range [-127,127]
+    
     assert w.numel() % group_size == 0
     ori_shape = w.shape
     w = w.float() # convert to float32
@@ -68,6 +71,32 @@ def quantize_q80(w, group_size):
     # find the max error across all groups
     maxerr = err.max().item()
     return int8val, scale, maxerr
+"""
+
+def quantize_q80(w, group_size):
+    assert w.numel() % group_size == 0
+    ori_shape = w.shape
+    w = w.float().reshape(-1, group_size)
+    
+    # Calculate the scaling factor
+    scale = 1.0 / w.abs().mean(dim=1).clamp(min=1e-5)
+    
+    # Quantize to ternary values {-1, 0, 1}
+    quant = (w * scale[:, None]).round().clamp(-1, 1)
+    
+    # Dequantize
+    w_quant = quant / scale[:, None]
+    
+    # Calculate the max error in each group
+    err = torch.abs(w_quant - w).max(dim=1).values
+    
+    # Find the max error across all groups
+    maxerr = err.max().item()
+    
+    # Get the scale of the original values relative to the new ones
+    scalar = torch.abs(w).max(dim=1).values
+    
+    return w_quant.view(ori_shape), scalar, maxerr
 
 # -----------------------------------------------------------------------------
 # legacy
@@ -244,6 +273,8 @@ def version2_export(model, filepath, group_size=64):
     for i, w in enumerate(weights):
         # quantize this weight
         q, s, err = quantize_q80(w, group_size)
+        #q, s = quantize_q80(w, group_size)
+        print(s)
         # save the int8 weights to file
         serialize_int8(out_file, q) # save the tensor in int8
         serialize_fp32(out_file, s) # save scale factors

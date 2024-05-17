@@ -1,10 +1,12 @@
-# HLS Implementation of Llama 2
+# HLS Implementation of BitNet
 
 ## Prerequisites
 1. EC2 instance (z1d.2xlarge recommended)
 3. AWS FPGA Developer AMI [(install)](https://github.com/aws/aws-fpga/blob/master/Vitis/README.md)
 4. S3 Bucket
-5. Pretrained model parameters & tokenizer can be found [here](https://drive.google.com/drive/folders/13awUjl2nhhBiRMesXR6O9zhnMoYbeACW?usp=sharing)
+
+## Model Creation
+Follow the instructions in the README in the cpu_benchmarks folder to create the model file with ternary weights.
 
 ## Build Instructions 
 1. Follow the setup for AWS FPGA Developer AMI

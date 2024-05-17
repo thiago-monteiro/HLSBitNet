@@ -95,6 +95,7 @@ norm:
   }
 }
 
+/*
 template <int N, int D>
 void matmul_old(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws)
 {
@@ -263,6 +264,101 @@ xs_buff:
       val += ((float)ival) * ws_buffer[j / GS] * xs_buffer[j / GS];
     }
     xout[i] = val;
+  }
+}*/
+
+template <int N, int D>
+void matmul(float *xout, int8_t *xq, float *xs, int8_t *wq, float *ws)
+{
+  // xout - output vector of size D
+  // xq - quantized input vector of size N
+  // xs - scaling factor for each element in xq
+  // wq - quantized weight matrix of size D x N
+  // ws - scaling factor for each row of wq
+
+  static int8_t x_buffer[N];
+  static float xs_buffer[N / GS];
+  static int8_t w_buffer[N];
+  static float ws_buffer[N / GS];
+  static float result_buffer[D];
+
+#pragma HLS ARRAY_PARTITION variable = x_buffer type = cyclic factor = 16
+#pragma HLS ARRAY_PARTITION variable = xs_buffer type = cyclic factor = 4
+#pragma HLS ARRAY_PARTITION variable = w_buffer type = cyclic factor = 32
+#pragma HLS ARRAY_PARTITION variable = ws_buffer type = cyclic factor = 32
+#pragma HLS ARRAY_PARTITION variable = result_buffer type = cyclic factor = 32
+
+  // Initialize result buffer to zero
+  for (int i = 0; i < D; i++)
+  {
+#pragma HLS PIPELINE
+    result_buffer[i] = 0.0f;
+  }
+
+  // Load xq into x_buffer
+  for (int i = 0; i < N; i++)
+  {
+#pragma HLS PIPELINE
+    x_buffer[i] = xq[i];
+  }
+
+  // Load xs into xs_buffer
+  for (int j = 0; j <= N - GS; j += GS)
+  {
+#pragma HLS PIPELINE
+    xs_buffer[j / GS] = xs[j / GS];
+  }
+
+  // Perform ternary matrix multiplication with scaling factors
+  for (int i = 0; i < D; i++)
+  {
+    const int in = i * N;
+    const int in_s = i * N / GS;
+    const int groups = N / GS;
+
+    // Load wq into w_buffer
+    for (int j = 0; j < N; j++)
+    {
+#pragma HLS PIPELINE
+      w_buffer[j] = wq[j + in];
+    }
+
+    // Load ws into ws_buffer
+    for (int j = 0; j < groups; j++)
+    {
+#pragma HLS PIPELINE
+      ws_buffer[j] = ws[in_s + j];
+    }
+
+    // Compute the dot product
+    for (int j = 0; j <= N - GS; j += GS)
+    {
+      int32_t ival = 0;
+      for (int k = 0; k < GS; k++)
+      {
+#pragma HLS PIPELINE
+        if (x_buffer[j + k] == -1 && w_buffer[j + k] == 1)
+        {
+          ival += -1;
+        }
+        else if (x_buffer[j + k] == 1 && w_buffer[j + k] == -1)
+        {
+          ival += -1;
+        }
+        else if (x_buffer[j + k] == 1 && w_buffer[j + k] == 1)
+        {
+          ival += 1;
+        }
+      }
+      result_buffer[i] += ((float)ival) * ws_buffer[j / GS] * xs_buffer[j / GS];
+    }
+  }
+
+  // Store the result buffer back to the xout array
+  for (int i = 0; i < D; i++)
+  {
+#pragma HLS PIPELINE
+    xout[i] = result_buffer[i];
   }
 }
 
