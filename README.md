@@ -6,7 +6,9 @@
 4. S3 Bucket
 
 ## Model Creation
-Follow the instructions in the README in the cpu_benchmarks folder to create the model file with ternary weights.
+First, use the new train_bitnet.py to create a 220M parameter bitnet model using the tinystories dataset.
+
+To quantize, follow the instructions in the README in the cpu_benchmarks folder to create the model file with ternary weights.
 
 ## Build Instructions 
 1. Follow the setup for AWS FPGA Developer AMI
