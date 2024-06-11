@@ -12,6 +12,7 @@ void dequantize(QuantizedTensor<S> *qx, float x[S], int GS)
   }
 }
 
+/*
 template <int S>
 void quantize(QuantizedTensor<S> *qx, float x[S], int GS)
 {
@@ -55,6 +56,56 @@ main_loop:
 #pragma HLS PIPELINE
       float quant_value = x[base_idx + i] / scale;   // scale
       int8_t quantized = (int8_t)round(quant_value); // round and clamp
+      quantized_buffer[base_idx + i] = quantized;
+    }
+  }
+
+  std::memcpy(qx->q, quantized_buffer, S * sizeof(int8_t));
+  std::memcpy(qx->s, scale_buffer, num_groups * sizeof(float));
+}
+*/
+
+template <int S>
+void quantize(QuantizedTensor<S> *qx, float x[S], int GS)
+{
+  constexpr int num_groups = S / 64;
+  constexpr float Q_MAX = 1.0f; // Maximum value for ternary quantization
+  float scale_buffer[num_groups];
+  int8_t quantized_buffer[S];
+
+  #pragma HLS ARRAY_PARTITION variable = quantized_buffer type=cyclic factor=64
+  #pragma HLS ARRAY_PARTITION variable = scale_buffer type=cyclic factor = 16
+
+main_loop:
+  for (int group = 0; group < num_groups; group++)
+  {
+    #pragma HLS UNROLL factor = 8
+    #pragma HLS PIPELINE
+    float wmax = 0.0;
+    int base_idx = group * GS;
+
+    // Calculate the max absolute value in the current group
+    max:
+    for (int i = 0; i < GS; i++)
+    {
+      #pragma HLS PIPELINE
+      float val = fabs(x[base_idx + i]);
+      if (val > wmax)
+      {
+        wmax = val;
+      }
+    }
+
+    // Calculate and write the scaling factor
+    float scale = wmax / Q_MAX;
+    scale_buffer[group] = scale;
+
+    // Calculate and write the quantized values
+    for (int i = 0; i < GS; i++)
+    {
+      #pragma HLS PIPELINE
+      float quant_value = x[base_idx + i] / scale; // scale
+      int8_t quantized = (quant_value > 0.5f) ? 1 : (quant_value < -0.5f) ? -1 : 0; // ternary quantization
       quantized_buffer[base_idx + i] = quantized;
     }
   }
