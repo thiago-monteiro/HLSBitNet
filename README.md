@@ -10,6 +10,8 @@ First, use the new train_bitnet.py to create a 220M parameter bitnet model using
 
 To quantize, follow the instructions in the README in the cpu_benchmarks folder to create the model file with ternary weights.
 
+Make sure config.h matches the model size.
+
 ## Build Instructions 
 1. Follow the setup for AWS FPGA Developer AMI
 2. Open the project in Vitis IDE
