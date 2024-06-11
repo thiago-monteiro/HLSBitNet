@@ -270,12 +270,8 @@ xs_buff:
         }*/
         int32_t buffer1 = (int32_t)x_buffer[j + k];
         int32_t buffer2 = (int32_t)w_buffer[j + k];
-        if (buffer1 == -1 and buffer2 == 1)
-          ival--;
-        if (buffer1 == 1 and buffer2 == -1)
-          ival--;
-        if (buffer1 == 1 and buffer2 == 1)
-          ival++;
+        if (buffer1 == -1) ival -= buffer2;
+        if (buffer1 == 1) ival += buffer2;
       }
       val += ((float)ival) * ws_buffer[j / GS] * xs_buffer[j / GS];
     }
